@@ -2,33 +2,48 @@
 % Please edit documentation in R/AR.OBR.R
 \name{AR.OBR}
 \alias{AR.OBR}
-\title{Online Bayesian Regression for Autoregressive (AR) Models}
+\title{Online Bayesian Regression for AR(p) Models}
 \usage{
 AR.OBR(y, p)
 }
 \arguments{
-\item{y}{A numeric vector or univariate time series.}
+\item{y}{A numeric vector representing the univariate time series.}
 
-\item{p}{A positive integer indicating the autoregressive order \eqn{p}.}
+\item{p}{An integer specifying the order of the AR(p) model.}
 }
 \value{
-An S7 object of class \code{AR.OBR} containing:
-\itemize{
-\item \code{y}: The input numeric time series.
-\item \code{p}: The autoregressive order.
-\item \code{phi}: A numeric vector of length \code{p} with the final estimated AR parameters.
-\item \code{history}: An \eqn{n \times p} numeric matrix containing posterior mean trajectories.
-\item \code{fitted}: A numeric vector of fitted values (\eqn{\hat{y}_t}).
-}
+An object of class \code{AR_OBR_class} containing the following slots:
+\item{y}{The original input time series.}
+\item{p}{The specified AR order.}
+\item{phi}{A numeric vector with the final estimated AR parameters.}
+\item{history}{A numeric matrix of dimension \code{n x p} tracking the sequential posterior mean trajectories.}
+\item{fitted}{A numeric vector containing the in-sample fitted values.}
 }
 \description{
-Fits an autoregressive time series model of order \eqn{p} using an Online
-Bayesian Regression (OBR) approach. It updates the posterior distribution
-of the AR coefficients sequentially as new observations arrive.
+Estimates the parameters of an Autoregressive AR(p) model using an Online Bayesian
+Regression (OBR) approach. The method performs sequential observation-by-observation
+updates of the parameter posterior distribution, leveraging mathematical conjugacy
+under a Gaussian likelihood framework to provide exact, closed-form sequential inference.
+}
+\details{
+The algorithm initializes the AR parameters with a zero-mean isotropic Gaussian prior.
+The prior precision matrix is initialized as \eqn{S_0^{-1} = \alpha I_p}, where
+the prior precision hyperparameter is fixed at \code{alpha = 2.0}. The observation
+noise precision is assumed fixed at \code{beta = 1.0}.
+
+At each time step \eqn{t}, the algorithm performs sequential learning (where the
+posterior of time \eqn{t-1} becomes the prior for time \eqn{t}) by analytically
+updating the precision matrix and the mean vector:
+\itemize{
+\item Precision update: \eqn{S_{t}^{-1} = S_{t-1}^{-1} + \beta (x_t x_t^T)}
+\item Mean update: \eqn{m_t = S_t (S_{t-1}^{-1} m_{t-1} + \beta x_t y_t)}
+}
+This recursive formulation allows the model to continuously adapt to streaming data
+without needing to store past observations in memory.
 }
 \examples{
 set.seed(123)
-y <- arima.sim(model = list(ar = c(0.4, -0.6)), n = 500)
+y <- arima.sim(model = list(ar = c(0.4, -0.6)), n = 100)
 fit <- AR.OBR(y = as.numeric(y), p = 2)
-fit@phi
+fit
 }

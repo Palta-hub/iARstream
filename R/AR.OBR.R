@@ -3,27 +3,23 @@
 AR_OBR_class <- S7::new_class(
   "AR.OBR",
   parent = Bayesian,
-  package = "iARest",
+  package = "iARstream",
   properties = list(
-    # Entradas
+
     y = S7::new_property(S7::class_numeric),
     p = S7::new_property(S7::class_numeric),
 
-    # Salida
     phi = S7::new_property(S7::class_any, default = NULL),
     history = S7::new_property(S7::class_any, default = NULL),
-    fitted  = S7::new_property(S7::class_any, default = NULL)
-  ),
+    fitted  = S7::new_property(S7::class_any, default = NULL)),
+
   validator = function(self) {
-    # p debe ser un unico número (el rezago), no un vector del tamaño de y
     if (length(self@p) != 1 || self@p < 1) {
       return("Property @p must be a positive integer indicating the model order.")
     }
-    # y debe ser lo suficientemente largo para el rezago p
     if (length(self@y) <= self@p) {
       return("The length of time series @y must be greater than order @p.")
     }
-
     return(NULL)
   }
 )
@@ -31,30 +27,22 @@ AR_OBR_class <- S7::new_class(
 # METODO PARA LA CLASE ----------------------------------------------------
 
 method(print, AR_OBR_class) <- function(x, ...) {
-  # Armar cadenas de texto de cada linea
-  header    <- sprintf("Online Bayesian Regression applied to AR(%s) ", x@p)
-
+  header    <- sprintf("Online Bayesian Regression applied to AR(%s)", x@p)
   if (is.null(x@phi)) {
     line_phi  <- "Phi estimated = Model not estimated yet"
   } else {
     line_phi  <- paste("Phi estimated =", paste(round(x@phi, 3), collapse = ", "))
   }
 
-  # Calcular la longitud maxima del contenido
   lines_vector <- c(header, line_phi)
   max_width    <- max(nchar(lines_vector))
-
-  # Generar las separaciones con la funcion strrep()
   sep_double <- strrep("=", max_width)
   sep_single <- strrep("-", max_width)
-
-  # Imprimir en consola
   cat(sep_double, "\n")
   cat(header, "\n")
   cat(sep_double, "\n")
   cat(line_phi, "\n")
   cat(sep_single, "\n")
-
   invisible(x)
 }
 
@@ -63,43 +51,54 @@ method(est, AR_OBR_class) <- function(x) {
     y = x@y,
     p = x@p
   )
-
   x@phi     <- res@phi
   x@history <- res@history
   x@fitted  <- res@fitted
-
   return(x)
 }
 
-# FUNCION OBR --------------------------------------------------------------
+# FUNCION AR.OBR ----------------------------------------------------------
 
-#' Online Bayesian Regression for Autoregressive (AR) Models
+#' Online Bayesian Regression for AR(p) Models
 #'
-#' @description
-#' Fits an autoregressive time series model of order \eqn{p} using an Online
-#' Bayesian Regression (OBR) approach. It updates the posterior distribution
-#' of the AR coefficients sequentially as new observations arrive.
+#' Estimates the parameters of an Autoregressive AR(p) model using an Online Bayesian
+#' Regression (OBR) approach. The method performs sequential observation-by-observation
+#' updates of the parameter posterior distribution, leveraging mathematical conjugacy
+#' under a Gaussian likelihood framework to provide exact, closed-form sequential inference.
 #'
-#' @param y A numeric vector or univariate time series.
-#' @param p A positive integer indicating the autoregressive order \eqn{p}.
+#' @details
+#' The algorithm initializes the AR parameters with a zero-mean isotropic Gaussian prior.
+#' The prior precision matrix is initialized as \eqn{S_0^{-1} = \alpha I_p}, where
+#' the prior precision hyperparameter is fixed at \code{alpha = 2.0}. The observation
+#' noise precision is assumed fixed at \code{beta = 1.0}.
 #'
-#' @return An S7 object of class \code{AR.OBR} containing:
+#' At each time step \eqn{t}, the algorithm performs sequential learning (where the
+#' posterior of time \eqn{t-1} becomes the prior for time \eqn{t}) by analytically
+#' updating the precision matrix and the mean vector:
 #' \itemize{
-#'   \item \code{y}: The input numeric time series.
-#'   \item \code{p}: The autoregressive order.
-#'   \item \code{phi}: A numeric vector of length \code{p} with the final estimated AR parameters.
-#'   \item \code{history}: An \eqn{n \times p} numeric matrix containing posterior mean trajectories.
-#'   \item \code{fitted}: A numeric vector of fitted values (\eqn{\hat{y}_t}).
+#'   \item Precision update: \eqn{S_{t}^{-1} = S_{t-1}^{-1} + \beta (x_t x_t^T)}
+#'   \item Mean update: \eqn{m_t = S_t (S_{t-1}^{-1} m_{t-1} + \beta x_t y_t)}
 #' }
+#' This recursive formulation allows the model to continuously adapt to streaming data
+#' without needing to store past observations in memory.
+#'
+#' @param y A numeric vector representing the univariate time series.
+#' @param p An integer specifying the order of the AR(p) model.
+#'
+#' @return An object of class \code{AR_OBR_class} containing the following slots:
+#' \item{y}{The original input time series.}
+#' \item{p}{The specified AR order.}
+#' \item{phi}{A numeric vector with the final estimated AR parameters.}
+#' \item{history}{A numeric matrix of dimension \code{n x p} tracking the sequential posterior mean trajectories.}
+#' \item{fitted}{A numeric vector containing the in-sample fitted values.}
 #'
 #' @export
 #'
 #' @examples
 #' set.seed(123)
-#' y <- arima.sim(model = list(ar = c(0.4, -0.6)), n = 500)
+#' y <- arima.sim(model = list(ar = c(0.4, -0.6)), n = 100)
 #' fit <- AR.OBR(y = as.numeric(y), p = 2)
-#' fit@phi
-
+#' fit
 AR.OBR <- function(y, p){
 
   if (length(y) <= p) {

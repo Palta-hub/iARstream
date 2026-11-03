@@ -2,7 +2,7 @@
 % Please edit documentation in R/iAR.ONS.R
 \name{iAR.ONS}
 \alias{iAR.ONS}
-\title{Online Newton Step for irregular Autoregressive (iAR) Models}
+\title{Online Newton Step for Irregularly Observed Autoregressive (iAR) Models}
 \usage{
 iAR.ONS(
   y,
@@ -14,37 +14,69 @@ iAR.ONS(
 \arguments{
 \item{y}{A numeric vector representing the univariate time series.}
 
-\item{times}{A numeric vector of observation times corresponding to \code{y}.
-Must have the same length as \code{y}.}
+\item{times}{A numeric vector of observation times corresponding to \code{y}. Must have the same length as \code{y}.}
 
-\item{phi_0}{An optional numeric value specifying the initial estimate for
-the iAR parameter. If \code{NULL} (default), it is initialized using the
-empirical autocorrelation.}
+\item{phi_0}{An optional numeric value specifying the initial estimate for the iAR parameter in \verb{(0, 1)}.
+If \code{NULL} (default), it is initialized using the empirical autocorrelation.}
 
 \item{loss_function}{A character string specifying the loss function to minimize.
-Must be one of \code{"quadratic"} (default), \code{"absolute"},
-\code{"logcosh"}, or \code{"huber"}.}
+Options are \code{"quadratic"} (default), \code{"absolute"}, \code{"logcosh"}, or \code{"huber"}.}
 }
 \value{
-A \code{list} containing:
-\itemize{
-\item \code{phi}: A numeric value representing the final robust estimated iAR parameter.
-\item \code{fitted}: A numeric vector of fitted values (\eqn{\hat{y}_t}).
-}
+An object of class \code{iAR_ONS_class} containing the following slots:
+\item{y}{The original input time series.}
+\item{times}{The vector of observation times.}
+\item{phi_0}{The initial parameter value used (either user-provided or auto-initialized).}
+\item{loss_function}{The loss function utilized.}
+\item{phi}{A numeric scalar with the final robust estimated iAR parameter.}
+\item{history}{A numeric matrix tracking parameter estimates during the last 5 epochs (Polyak-Ruppert averaging window).}
+\item{fitted}{A numeric vector containing the in-sample fitted values.}
 }
 \description{
-Fits an irregularly observed autoregressive time series model (iAR) using the
-Online Newton Step (ONS) optimization algorithm. The method uses a damped
-pseudo-Hessian approximation, cosine annealing for the learning rate, and
-Polyak-Ruppert averaging over the final epochs for robust estimation.
+Performs online parameter estimation for irregularly observed Autoregressive (iAR) models
+via the Online Newton Step (ONS) optimization algorithm.
+}
+\details{
+The algorithm accounts for irregular observation intervals using the continuous-time
+prediction rule \eqn{\hat{y}_j = \phi^{\Delta t_j} y_{j-1}}, where \eqn{\Delta t_j = t_j - t_{j-1}}.
+Optimization is conducted in an unconstrained parameter space via the logistic link
+\eqn{\gamma = \text{logit}(\phi)} to strictly enforce \eqn{\phi \in (0, 1)}. It supports
+four customizable robust loss functions (quadratic, absolute, Huber, and log-cosh) to
+accommodate diverse noise structures and outliers.
+
+Parameter updates are computed using a Damped Online Newton Step mechanic, which maintains
+an exponentially decayed pseudo-Hessian running sum \eqn{A_t = \beta A_{t-1} + g_t^2}
+initialized with \code{epsilon = 1e-3} and a decay rate of \code{beta = 0.99}. The optimization utilizes
+a Cosine Annealing learning rate schedule across 20 epochs, decaying smoothly from \code{eta = 0.2}
+down to \code{eta_min = 0.01}.
+
+If no initial parameter \code{phi_0} is provided, it is smartly initialized using the empirical
+autocorrelation scaled by the mean time gap. The final parameter estimate \code{phi} is computed
+using Polyak-Ruppert averaging over the last 5 epochs, removing a 20\% burn-in period from the
+time series trajectory to ensure robust convergence.
 }
 \examples{
-# Simulate irregular times and an iAR process
+# ------------------------------------------------------------------
+# Example 1: iAR Normal model
+# ------------------------------------------------------------------
 set.seed(123)
-times <- cumsum(rexp(100, rate = 1))
-y <- rnorm(100) # Replace with actual iAR simulation if available
+o <- iAR::utilities()
+o <- iAR::gentime(o, n = 200, distribution = "uniform")
+times <- o@times
+y_norm <- rnorm(200)
 
-# Fit the iAR model via ONS
-fit <- iAR.ONS(y = y, times = times, loss_function = "quadratic")
-fit@phi
+fit_norm <- iAR.ONS(y = y_norm, times = times, loss_function = "quadratic")
+fit_norm
+
+# ------------------------------------------------------------------
+# Example 2: iAR Student-t model
+# ------------------------------------------------------------------
+set.seed(123)
+o <- iAR::utilities()
+o <- iAR::gentime(o, n = 200, distribution = "uniform")
+times <- o@times
+y_t <- rt(200, df = 5)
+
+fit_t <- iAR.ONS(y = y_t, times = times, loss_function = "logcosh")
+fit_t
 }

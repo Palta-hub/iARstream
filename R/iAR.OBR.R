@@ -3,27 +3,23 @@
 iAR_OBR_class <- S7::new_class(
   "iAR.OBR",
   parent = Bayesian,
-  package = "iARest",
+  package = "iARstream",
   properties = list(
-    # Entradas
+
     y     = S7::new_property(S7::class_numeric),
     times = S7::new_property(S7::class_numeric),
 
-    #Salidas
     phi = S7::new_property(S7::class_any, default = NULL),
     history = S7::new_property(S7::class_any, default = NULL),
-    fitted  = S7::new_property(S7::class_any, default = NULL)
-  ),
+    fitted  = S7::new_property(S7::class_any, default = NULL)),
+
   validator = function(self) {
-    # y, times deben ser vectores unidimensionales
     if (!is.null(dim(self@times)) || !is.null(dim(self@y))) {
       return("Propertys @times and @y must be numeric vectors")
     }
-    # deben tener la misma longitud
     if (length(self@times) != length(self@y)) {
       return("The length of @times must be the same as the length of @y")
     }
-
     return(NULL)
   }
 )
@@ -31,41 +27,30 @@ iAR_OBR_class <- S7::new_class(
 # METODO PARA LA CLASE ----------------------------------------------------
 
 method(print, iAR_OBR_class) <- function(x, ...) {
-  # Armar cadenas de texto de cada linea
   header    <- sprintf("Online Bayesian Regression applied to iAR")
-
   if (is.null(x@phi)) {
     line_phi  <- "Phi estimated = Model not estimated yet"
   } else {
     line_phi  <- paste("Phi estimated =", paste(round(x@phi, 3), collapse = ", "))
   }
 
-  # Calcular la longitud maxima del contenido
-  lines_vector <- c(header, line_loss, line_phi)
+  lines_vector <- c(header, line_phi)
   max_width    <- max(nchar(lines_vector))
-
-  # Generar las separaciones con la funcion strrep()
   sep_double <- strrep("=", max_width)
   sep_single <- strrep("-", max_width)
-
-  # Imprimir en consola
   cat(sep_double, "\n")
   cat(header, "\n")
   cat(sep_double, "\n")
-  cat(line_loss, "\n")
   cat(line_phi, "\n")
   cat(sep_single, "\n")
-
   invisible(x)
 }
 
 method(est, iAR_OBR_class) <- function(x) {
-  res <- iAR.ORB(
+  res <- iAR.OBR(
     y        = x@y,
     times    = x@times
     )
-
-  #devoler mateiz
     x@phi     <- res@phi
     x@history <- res@history
     x@fitted  <- res@fitted
@@ -73,43 +58,76 @@ method(est, iAR_OBR_class) <- function(x) {
 }
 
 # FUNCION iAR.OBR -------------------------------------------------------------
-
-#' Online Bayesian Regression for irregular Autoregressive (iAR) Models
+#' Online Bayesian Regression for Irregularly Observed Autoregressive (iAR) Models
 #'
 #' @description
-#' Fits an irregularly observed autoregressive time series model (iAR) using an
-#' Online Bayesian Regression (OBR) approach. It utilizes a discrete grid filter
-#' to approximate the exact iAR likelihood and updates the posterior distribution
-#' of the autoregressive parameter sequentially. Prior parameters (uniform grid)
-#' are fixed internally.
+#' Performs online parameter estimation for irregularly observed Autoregressive (iAR) models
+#' using a discrete-grid Online Bayesian Regression (OBR) approach.
+#'
+#' The algorithm accounts for irregular observation intervals using the exact continuous-time
+#' prediction rule \eqn{\hat{y}_j = \phi^{\Delta t_j} y_{j-1}}, where \eqn{\Delta t_j = t_j - t_{j-1}},
+#' combined with the theoretical conditional variance \eqn{1 - \phi^{2\Delta t_j}}.
+#'
+#' @details
+#' The function approximates the continuous posterior distribution by discretizing the
+#' parameter space of \eqn{\phi} into a fine grid of 1000 equally spaced candidate values
+#' ranging from \eqn{0.001} to \eqn{0.999}.
+#'
+#' Starting from a uniform prior on the logarithmic scale, the algorithm sequentially
+#' updates the posterior distribution utilizing the exact Gaussian log-likelihood of the
+#' iAR process. To guarantee numerical stability over long sequences and prevent floating-point
+#' underflow, it employs the Log-Sum-Exp trick before converting the log-posteriors back
+#' to normalized probabilities. At each time step, the sequential point estimate is
+#' extracted as the posterior mean of the distribution.
 #'
 #' @param y A numeric vector representing the univariate time series.
 #' @param times A numeric vector of observation times corresponding to \code{y}.
 #'   Must have the same length as \code{y}.
 #'
-#' @return An S7 object of class \code{iAR.OBR} containing:
-#' \itemize{
-#'   \item \code{y}: The input numeric time series.
-#'   \item \code{times}: Observation times.
-#'   \item \code{phi}: A numeric value representing the final estimated iAR coefficient.
-#'   \item \code{history}: A numeric vector containing the sequence of posterior means at each time step.
-#'   \item \code{fitted}: A numeric vector of fitted values (\eqn{\hat{y}_t}).
-#' }
+#' @return An object of class \code{iAR_OBR_class} containing the following slots:
+#' \item{y}{The original input time series.}
+#' \item{times}{The vector of observation times.}
+#' \item{phi}{A numeric scalar with the final estimated iAR parameter (the posterior mean at the final step).}
+#' \item{history}{A numeric vector tracking the sequence of posterior means at each time step.}
+#' \item{fitted}{A numeric vector containing the in-sample fitted values (\eqn{\hat{y}_t}).}
 #'
 #' @export
 #'
 #' @examples
-#' # Simulate irregular times and an iAR process
+#' # ------------------------------------------------------------------
+#' # Example 1: iAR Normal model
+#' # ------------------------------------------------------------------
 #' set.seed(123)
-#' times <- cumsum(rexp(100, rate = 1))
-#' y <- rnorm(100) # Replace with actual iAR simulation if available
+#' o <- iAR::utilities()
+#' o <- iAR::gentime(o, n = 200, distribution = "uniform")
+#' times <- o@times
 #'
-#' # Fit the iAR model via OBR
-#' fit <- iAR.OBR(y = y, times = times)
-#' fit@phi
-
-
+#' y_norm <- rnorm(200)
+#'
+#' fit_norm <- iAR.OBR(y = y_norm, times = times)
+#' fit_norm
+#'
+#' # ------------------------------------------------------------------
+#' # Example 2: iAR Student-t model
+#' # ------------------------------------------------------------------
+#' set.seed(123)
+#' o <- iAR::utilities()
+#' o <- iAR::gentime(o, n = 200, distribution = "uniform")
+#' times <- o@times
+#'
+#' y_t <- rt(200, df = 5)
+#'
+#' fit_t <- iAR.OBR(y = y_t, times = times)
+#' fit_t
 iAR.OBR <- function(y, times) {
+  y <- as.vector(as.numeric(y))
+  times <- as.vector(as.numeric(times))
+  if (length(y) < 2) {
+    stop("La serie de tiempo 'y' debe tener al menos 2 observaciones.")
+  }
+  if (length(y) != length(times)) {
+    stop("Los vectores 'y' y 'times' deben tener la misma longitud.")
+  }
   n <- length(y)
   phi_est <- rep(NA, n)
 

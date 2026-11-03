@@ -1,14 +1,28 @@
-Package: iARest
-Title: What the Package Does (One Line, Title Case)
+Package: iARstream
+Title: Classical and Bayesian Online Estimation for AR(p) and iAR Models
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+    person("Nicol", "González", email = "nicol.gonmac@gmail.com", role = c("aut", "cre"))
+Description: Provides classical and Bayesian online estimation methods for AR(p) and iAR Models. 
+  Classical optimization routines include Online Gradient Descent (OGD) and Online Newton Step (ONS), 
+  supporting quadratic, absolute, Huber, and Log-Cosh loss functions. 
+  Bayesian approaches include Online Particle Filtering (OPF), supporting Gaussian, Laplace and Student-t 
+  error distributions, and Online Bayesian Regression (OBR) under a Gaussian likelihood framework. 
+  Designed for sequential parameter updating in streaming and real-time time series analysis.
+Imports: 
+    S7,
+    stats, 
+    truncnorm
+Suggests:
+    iAR,
+    testthat (>= 3.0.0)
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
-Imports: 
-    S7
-URL: https://github.com/Palta-hub/iARest
-BugReports: https://github.com/Palta-hub/iARest/issues
+URL: https://github.com/Palta-hub/iARstream
+BugReports: https://github.com/Palta-hub/iARstream/issues
+Config/testthat/edition: 3
+Depends: 
+    R (>= 3.5)
+LazyData: true

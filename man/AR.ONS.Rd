@@ -2,7 +2,7 @@
 % Please edit documentation in R/AR.ONS.R
 \name{AR.ONS}
 \alias{AR.ONS}
-\title{Online Newton Step for Autoregressive (AR) Models}
+\title{Online Newton Step for AR(p) Models}
 \usage{
 AR.ONS(
   y,
@@ -12,38 +12,47 @@ AR.ONS(
 )
 }
 \arguments{
-\item{y}{A numeric vector or univariate time series (\code{ts}).}
+\item{y}{A numeric vector representing the univariate time series.}
 
-\item{p}{A positive integer indicating the autoregressive order \eqn{p}.}
+\item{p}{An integer specifying the order of the AR(p) model.}
 
-\item{phi_0}{An optional numeric vector of length \code{p} with the initial
-values for the AR coefficients. If \code{NULL} (default), coefficients are
-initialized to \code{0.1}.}
+\item{phi_0}{An optional numeric vector of length \code{p} containing initial parameter values.
+If \code{NULL}, defaults to a vector with values 0.1.}
 
 \item{loss_function}{A character string specifying the loss function to minimize.
-Must be one of \code{"quadratic"} (default), \code{"absolute"},
-\code{"logcosh"}, or \code{"huber"}.}
+Options are \code{"quadratic"} (default), \code{"absolute"}, \code{"logcosh"}, or \code{"huber"}.}
 }
 \value{
-An S7 object of class \code{AR.ONS} containing:
-\itemize{
-\item \code{y}: The input numeric time series.
-\item \code{p}: The autoregressive order.
-\item \code{phi_0}: Initial coefficients vector.
-\item \code{loss_function}: The loss function used.
-\item \code{phi}: A numeric vector of length \code{p} with the estimated autoregressive parameters (averaged over the series).
-\item \code{history}: An \eqn{n \times p} numeric matrix containing the coefficient trajectory at the final epoch.
-\item \code{fitted}: A numeric vector of fitted values (\eqn{\hat{y}_t}).
-}
+An object of class \code{AR_ONS_class} containing the following slots:
+\item{y}{The original input time series.}
+\item{p}{The specified AR order.}
+\item{loss_function}{The loss function utilized.}
+\item{phi0}{The initial parameter values used.}
+\item{phi}{A numeric vector with the final estimated AR parameters (averaged over the last epoch).}
+\item{history}{A numeric matrix of dimension \verb{n x p} tracking parameter estimates during the last epoch.}
+\item{fitted}{A numeric vector containing the in-sample fitted values.}
 }
 \description{
-Fits an autoregressive time series model of order \eqn{p} using the Online Newton
-Step (ONS) optimization algorithm. It supports multiple loss functions and uses
-a learning rate schedule with cosine annealing.
+Estimates the parameters of an Autoregressive AR(p) model using Online Newton Step (ONS)
+optimization with sequential observation-by-observation updates across multiple epochs.
+The method incorporates second-order optimization mechanics by dynamically tracking a
+regularized second-moment matrix alongside quadratic, absolute, Huber, and log-cosh
+loss functions for robust estimation under non-Gaussian noise. Parameter updates are
+controlled via a Cosine Annealing learning rate schedule, with box-constraints to maintain
+stability and final estimates computed via epoch-averaged trajectories.
+}
+\details{
+The optimization process uses a Cosine Annealing learning rate schedule across 30 epochs,
+smoothly decaying the learning rate from \code{eta = 0.1} down to \code{eta_min = 0.001}.
+The Online Newton Step algorithm maintains a running second-moment matrix
+\eqn{A_t = \beta A_{t-1} + (1 - \beta) g_t g_t^T} initialized with \eqn{A_0 = \epsilon I_p}
+(\code{eps = 1e-4}, \code{beta = 0.99}). To ensure numerical stability, the estimated AR parameters
+are bounded within \verb{[-0.999, 0.999]} at each iteration. For the Huber loss function,
+the clipping threshold is set to \code{delta = 1.345}.
 }
 \examples{
 set.seed(123)
-y <- arima.sim(model = list(ar = c(0.6, -0.3)), n = 500)
-fit <- AR.ONS(y = as.numeric(y), p = 2, loss_function = "quadratic")
-fit@phi
+y <- arima.sim(model = list(ar = c(0.6, -0.3)), n = 100)
+fit <- AR.ONS(y = y, p = 2, loss_function = "quadratic")
+fit
 }

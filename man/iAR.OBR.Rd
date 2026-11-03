@@ -2,7 +2,7 @@
 % Please edit documentation in R/iAR.OBR.R
 \name{iAR.OBR}
 \alias{iAR.OBR}
-\title{Online Bayesian Regression for irregular Autoregressive (iAR) Models}
+\title{Online Bayesian Regression for Irregularly Observed Autoregressive (iAR) Models}
 \usage{
 iAR.OBR(y, times)
 }
@@ -13,29 +13,57 @@ iAR.OBR(y, times)
 Must have the same length as \code{y}.}
 }
 \value{
-An S7 object of class \code{iAR.OBR} containing:
-\itemize{
-\item \code{y}: The input numeric time series.
-\item \code{times}: Observation times.
-\item \code{phi}: A numeric value representing the final estimated iAR coefficient.
-\item \code{history}: A numeric vector containing the sequence of posterior means at each time step.
-\item \code{fitted}: A numeric vector of fitted values (\eqn{\hat{y}_t}).
-}
+An object of class \code{iAR_OBR_class} containing the following slots:
+\item{y}{The original input time series.}
+\item{times}{The vector of observation times.}
+\item{phi}{A numeric scalar with the final estimated iAR parameter (the posterior mean at the final step).}
+\item{history}{A numeric vector tracking the sequence of posterior means at each time step.}
+\item{fitted}{A numeric vector containing the in-sample fitted values (\eqn{\hat{y}_t}).}
 }
 \description{
-Fits an irregularly observed autoregressive time series model (iAR) using an
-Online Bayesian Regression (OBR) approach. It utilizes a discrete grid filter
-to approximate the exact iAR likelihood and updates the posterior distribution
-of the autoregressive parameter sequentially. Prior parameters (uniform grid)
-are fixed internally.
+Performs online parameter estimation for irregularly observed Autoregressive (iAR) models
+using a discrete-grid Online Bayesian Regression (OBR) approach.
+
+The algorithm accounts for irregular observation intervals using the exact continuous-time
+prediction rule \eqn{\hat{y}_j = \phi^{\Delta t_j} y_{j-1}}, where \eqn{\Delta t_j = t_j - t_{j-1}},
+combined with the theoretical conditional variance \eqn{1 - \phi^{2\Delta t_j}}.
+}
+\details{
+The function approximates the continuous posterior distribution by discretizing the
+parameter space of \eqn{\phi} into a fine grid of 1000 equally spaced candidate values
+ranging from \eqn{0.001} to \eqn{0.999}.
+
+Starting from a uniform prior on the logarithmic scale, the algorithm sequentially
+updates the posterior distribution utilizing the exact Gaussian log-likelihood of the
+iAR process. To guarantee numerical stability over long sequences and prevent floating-point
+underflow, it employs the Log-Sum-Exp trick before converting the log-posteriors back
+to normalized probabilities. At each time step, the sequential point estimate is
+extracted as the posterior mean of the distribution.
 }
 \examples{
-# Simulate irregular times and an iAR process
+# ------------------------------------------------------------------
+# Example 1: iAR Normal model
+# ------------------------------------------------------------------
 set.seed(123)
-times <- cumsum(rexp(100, rate = 1))
-y <- rnorm(100) # Replace with actual iAR simulation if available
+o <- iAR::utilities()
+o <- iAR::gentime(o, n = 200, distribution = "uniform")
+times <- o@times
 
-# Fit the iAR model via OBR
-fit <- iAR.OBR(y = y, times = times)
-fit@phi
+y_norm <- rnorm(200)
+
+fit_norm <- iAR.OBR(y = y_norm, times = times)
+fit_norm
+
+# ------------------------------------------------------------------
+# Example 2: iAR Student-t model
+# ------------------------------------------------------------------
+set.seed(123)
+o <- iAR::utilities()
+o <- iAR::gentime(o, n = 200, distribution = "uniform")
+times <- o@times
+
+y_t <- rt(200, df = 5)
+
+fit_t <- iAR.OBR(y = y_t, times = times)
+fit_t
 }

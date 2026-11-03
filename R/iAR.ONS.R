@@ -3,131 +3,138 @@
 iAR_ONS_class <- S7::new_class(
   "iAR.ONS",
   parent = Classical,
-  package = "iARest",
+  package = "iARstream",
   properties = list(
-    # Entradas del modelo
+
     y      = S7::new_property(S7::class_numeric),
     times  = S7::new_property(S7::class_numeric),
     phi_0  = S7::new_property(S7::class_any, default = NULL),
     loss_function   = S7::new_property(S7::class_character, default = "quadratic"),
 
-    # Salidas del modelo (inician nulas)
     phi = S7::new_property(S7::class_any, default = NULL),
     history       = S7::new_property(S7::class_any, default = NULL),
-    fitted        = S7::new_property(S7::class_any, default = NULL)
-  ),
+    fitted        = S7::new_property(S7::class_any, default = NULL)),
+
   validator = function(self) {
-    # Validar tamaño de y
     if (length(self@y) < 2) {
       return("The length of time series @y must be at least 2.")
     }
-
-    # Validar dimensiones de y y times
     if (length(self@times) != length(self@y)) {
       return("The length of @times must be the same as the length of @y")
     }
-
-    # Validar opciones permitidas para la funcion de pérdida
     valid_losses <- c("quadratic", "absolute", "logcosh", "huber")
     if (!(self@loss_function %in% valid_losses)) {
       return("Property @loss_function must be 'quadratic', 'absolute', 'logcosh', or 'huber'.")
     }
-
     return(NULL)
   }
 )
 
 # METODO PARA LA CLASE ----------------------------------------------------
-method(print, iAR_ONS_class) <- function(x, ...) {
-  # Armar cadenas de texto de cada linea
-  header    <- "Online Newton Step applied to iAR "
-  line_fam  <- paste("Family        =", x@family)
-  line_loss <- paste("Loss Function =", x@loss_function)
 
+method(print, iAR_ONS_class) <- function(x, ...) {
+  header    <- "Online Newton Step applied to iAR"
+  line_loss <- paste("Loss Function =", tools::toTitleCase(x@loss_function))
   if (is.null(x@phi)) {
     line_phi  <- "Phi estimated = Model not estimated yet"
   } else {
     line_phi  <- paste("Phi estimated =", round(x@phi, 3))
   }
 
-  # Calcular la longitud maxima del contenido
-  lines_vector <- c(header, line_fam, line_loss, line_phi)
+  lines_vector <- c(header, line_loss, line_phi)
   max_width    <- max(nchar(lines_vector))
-
-  # Generar las separaciones con la funcion strrep()
   sep_double <- strrep("=", max_width)
   sep_single <- strrep("-", max_width)
-
-  # Imprimir en consola
   cat(sep_double, "\n")
   cat(header, "\n")
   cat(sep_double, "\n")
-  cat(line_fam, "\n")
   cat(line_loss, "\n")
   cat(line_phi, "\n")
   cat(sep_single, "\n")
-
   invisible(x)
 }
 
 method(est, iAR_ONS_class) <- function(x) {
-
-  # 1. Ejecutar la función matemática con los parámetros de la clase
   res <- iAR.ONS(
     y      = x@y,
     times  = x@times,
     phi_0  = x@phi_0,
     loss_function   = x@loss_function
   )
-
-  # 2. Guardar todos los resultados en el objeto original
   x@phi     <- res@phi
   x@history <- res@history
   x@fitted  <- res@fitted
-
-  # 3. Retornar el objeto actualizado
   return(x)
 }
 
 # FUNCION ONS -------------------------------------------------------------
 
-#' Online Newton Step for irregular Autoregressive (iAR) Models
+#' Online Newton Step for Irregularly Observed Autoregressive (iAR) Models
 #'
-#' @description
-#' Fits an irregularly observed autoregressive time series model (iAR) using the
-#' Online Newton Step (ONS) optimization algorithm. The method uses a damped
-#' pseudo-Hessian approximation, cosine annealing for the learning rate, and
-#' Polyak-Ruppert averaging over the final epochs for robust estimation.
+#' Performs online parameter estimation for irregularly observed Autoregressive (iAR) models
+#' via the Online Newton Step (ONS) optimization algorithm.
+#'
+#' The algorithm accounts for irregular observation intervals using the continuous-time
+#' prediction rule \eqn{\hat{y}_j = \phi^{\Delta t_j} y_{j-1}}, where \eqn{\Delta t_j = t_j - t_{j-1}}.
+#' Optimization is conducted in an unconstrained parameter space via the logistic link
+#' \eqn{\gamma = \text{logit}(\phi)} to strictly enforce \eqn{\phi \in (0, 1)}. It supports
+#' four customizable robust loss functions (quadratic, absolute, Huber, and log-cosh) to
+#' accommodate diverse noise structures and outliers.
+#'
+#' @details
+#' Parameter updates are computed using a Damped Online Newton Step mechanic, which maintains
+#' an exponentially decayed pseudo-Hessian running sum \eqn{A_t = \beta A_{t-1} + g_t^2}
+#' initialized with `epsilon = 1e-3` and a decay rate of `beta = 0.99`. The optimization utilizes
+#' a Cosine Annealing learning rate schedule across 20 epochs, decaying smoothly from `eta = 0.2`
+#' down to `eta_min = 0.01`.
+#'
+#' If no initial parameter `phi_0` is provided, it is smartly initialized using the empirical
+#' autocorrelation scaled by the mean time gap. The final parameter estimate `phi` is computed
+#' using Polyak-Ruppert averaging over the last 5 epochs, removing a 20% burn-in period from the
+#' time series trajectory to ensure robust convergence.
 #'
 #' @param y A numeric vector representing the univariate time series.
-#' @param times A numeric vector of observation times corresponding to \code{y}.
-#'   Must have the same length as \code{y}.
-#' @param phi_0 An optional numeric value specifying the initial estimate for
-#'   the iAR parameter. If \code{NULL} (default), it is initialized using the
-#'   empirical autocorrelation.
+#' @param times A numeric vector of observation times corresponding to `y`. Must have the same length as `y`.
+#' @param phi_0 An optional numeric value specifying the initial estimate for the iAR parameter in `(0, 1)`.
+#'   If `NULL` (default), it is initialized using the empirical autocorrelation.
 #' @param loss_function A character string specifying the loss function to minimize.
-#'   Must be one of \code{"quadratic"} (default), \code{"absolute"},
-#'   \code{"logcosh"}, or \code{"huber"}.
+#'   Options are `"quadratic"` (default), `"absolute"`, `"logcosh"`, or `"huber"`.
 #'
-#' @return A \code{list} containing:
-#' \itemize{
-#'   \item \code{phi}: A numeric value representing the final robust estimated iAR parameter.
-#'   \item \code{fitted}: A numeric vector of fitted values (\eqn{\hat{y}_t}).
-#' }
+#' @return An object of class `iAR_ONS_class` containing the following slots:
+#' \item{y}{The original input time series.}
+#' \item{times}{The vector of observation times.}
+#' \item{phi_0}{The initial parameter value used (either user-provided or auto-initialized).}
+#' \item{loss_function}{The loss function utilized.}
+#' \item{phi}{A numeric scalar with the final robust estimated iAR parameter.}
+#' \item{history}{A numeric matrix tracking parameter estimates during the last 5 epochs (Polyak-Ruppert averaging window).}
+#' \item{fitted}{A numeric vector containing the in-sample fitted values.}
 #'
 #' @export
 #'
 #' @examples
-#' # Simulate irregular times and an iAR process
+#' # ------------------------------------------------------------------
+#' # Example 1: iAR Normal model
+#' # ------------------------------------------------------------------
 #' set.seed(123)
-#' times <- cumsum(rexp(100, rate = 1))
-#' y <- rnorm(100) # Replace with actual iAR simulation if available
+#' o <- iAR::utilities()
+#' o <- iAR::gentime(o, n = 200, distribution = "uniform")
+#' times <- o@times
+#' y_norm <- rnorm(200)
 #'
-#' # Fit the iAR model via ONS
-#' fit <- iAR.ONS(y = y, times = times, loss_function = "quadratic")
-#' fit@phi
-
-
+#' fit_norm <- iAR.ONS(y = y_norm, times = times, loss_function = "quadratic")
+#' fit_norm
+#'
+#' # ------------------------------------------------------------------
+#' # Example 2: iAR Student-t model
+#' # ------------------------------------------------------------------
+#' set.seed(123)
+#' o <- iAR::utilities()
+#' o <- iAR::gentime(o, n = 200, distribution = "uniform")
+#' times <- o@times
+#' y_t <- rt(200, df = 5)
+#'
+#' fit_t <- iAR.ONS(y = y_t, times = times, loss_function = "logcosh")
+#' fit_t
 iAR.ONS <- function(y, times,
                     phi_0 = NULL,
                     loss_function = c("quadratic", "absolute", "logcosh", "huber")) {

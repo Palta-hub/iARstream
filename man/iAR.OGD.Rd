@@ -2,7 +2,7 @@
 % Please edit documentation in R/iAR.OGD.R
 \name{iAR.OGD}
 \alias{iAR.OGD}
-\title{Online Gradient Descent for iAR Models}
+\title{Online Gradient Descent for Irregularly Observed Autoregressive (iAR) Models}
 \usage{
 iAR.OGD(
   y,
@@ -15,31 +15,69 @@ iAR.OGD(
 \arguments{
 \item{y}{A numeric vector representing the univariate time series.}
 
-\item{times}{A numeric vector of observation times corresponding to \code{y}.
-Must have the same length as \code{y}.}
+\item{times}{A numeric vector of observation times corresponding to \code{y}. Must have the same length as \code{y}.}
 
-\item{family}{A character string specifying the assumed distribution family.
+\item{family}{A character string specifying the assumed noise distribution family.
 Options are \code{"norm"} (default) or \code{"t"}.}
 
 \item{loss_function}{A character string specifying the loss function to minimize.
 Options are \code{"quadratic"} (default), \code{"absolute"}, \code{"logcosh"}, or \code{"huber"}.}
 
-\item{phi0}{An optional numeric value containing the initial parameter estimate.
-If \code{NULL}, defaults to 0.5.}
+\item{phi0}{An optional numeric value specifying the initial parameter estimate in \verb{(0, 1)}.
+If \code{NULL}, defaults to \code{0.5}.}
 }
 \value{
-A list containing:
-\item{phi_estimate}{A numeric value with the final robust estimated iAR parameter.}
+An object of class \code{iAR_OGD_class} containing the following slots:
+\item{y}{The original input time series.}
+\item{times}{The vector of observation times.}
+\item{family}{The selected distribution family.}
+\item{loss_function}{The loss function utilized.}
+\item{phi0}{The initial parameter value used.}
+\item{phi}{A numeric scalar with the final robust estimated iAR parameter.}
+\item{history}{A numeric vector tracking parameter estimates during the last epoch.}
+\item{fitted}{A numeric vector containing the in-sample fitted values.}
 }
 \description{
-Estimates the parameters of an irregularly observed Autoregressive (iAR) model
-using Online Gradient Descent (OGD) coupled with the Adam optimizer. Supports
-adaptive learning rates, different distribution families, and robust loss functions.
+Performs online parameter estimation for irregularly observed Autoregressive (iAR) models
+via Online Gradient Descent (OGD) coupled with the Adam optimizer.
+}
+\details{
+The algorithm accounts for irregular observation intervals using the continuous-time
+prediction rule \eqn{\hat{y}_j = \phi^{\Delta t_j} y_{j-1}}, where \eqn{\Delta t_j = t_j - t_{j-1}}.
+Optimization is conducted in an unconstrained parameter space via the logistic link
+\eqn{\theta = \text{logit}(\phi)} to strictly enforce \eqn{\phi \in (0, 1)}. To accommodate
+diverse noise structures and outliers, it supports normal (\code{"norm"}) and Student-t (\code{"t"})
+distribution families alongside four customizable loss functions (quadratic, absolute, Huber,
+and log-cosh).
+
+Parameter updates are computed using the Adam adaptive optimizer (\code{beta1 = 0.9}, \code{beta2 = 0.999},
+\code{epsilon = 1e-8}) in combination with a Cosine Annealing learning rate schedule across 20 epochs,
+decaying smoothly from \code{eta_max = 0.1} down to \code{eta_min = 0.01}. To maintain numerical
+stability, gradients are clipped to \verb{[-5, 5]}. The final parameter estimate \code{phi} is computed
+by removing a 20\% burn-in period from the last epoch's trajectory before taking the robust average.
 }
 \examples{
+# ------------------------------------------------------------------
+# Example 1: iAR Normal model
+# ------------------------------------------------------------------
 set.seed(123)
-times <- cumsum(rexp(100, rate = 1))
-y <- rnorm(100) # Replace with actual iAR simulation
-fit <- iAR.OGD(y = y, times = times)
-fit@phi
+o <- iAR::utilities()
+o <- iAR::gentime(o, n = 200, distribution = "uniform")
+times <- o@times
+y_norm <- rnorm(200)
+
+fit_norm <- iAR.OGD(y = y_norm, times = times, family = "norm", loss_function = "quadratic")
+fit_norm
+
+# ------------------------------------------------------------------
+# Example 2: iAR Student-t model
+# ------------------------------------------------------------------
+set.seed(123)
+o <- iAR::utilities()
+o <- iAR::gentime(o, n = 200, distribution = "uniform")
+times <- o@times
+y_t <- rt(200, df = 5)
+
+fit_t <- iAR.OGD(y = y_t, times = times, family = "t", loss_function = "logcosh")
+fit_t
 }

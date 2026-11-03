@@ -20,20 +20,36 @@ AR.OGD(
 Options are \code{"quadratic"} (default), \code{"absolute"}, \code{"logcosh"}, or \code{"huber"}.}
 
 \item{phi0}{An optional numeric vector of length \code{p} containing initial parameter values.
-If \code{NULL}, defaults to a vector of 0.1 values.}
+If \code{NULL}, defaults to a vector with values 0.1.}
 }
 \value{
-A list containing:
-\item{phi}{A numeric vector with the final estimated AR parameters.}
-\item{history}{A numeric matrix of dimension \code{n x p} tracking parameter estimates during the last epoch.}
+An object of class \code{AR_OGD_class} containing the following slots:
+\item{y}{The original input time series.}
+\item{p}{The specified AR order.}
+\item{loss_function}{The loss function utilized.}
+\item{phi0}{The initial parameter values used.}
+\item{phi}{A numeric vector with the final estimated AR parameters (averaged over the last epoch).}
+\item{history}{A numeric matrix of dimension \verb{n x p} tracking parameter estimates during the last epoch.}
+\item{fitted}{A numeric vector containing the in-sample fitted values.}
 }
 \description{
-Estimates the parameters of an Autoregressive model of order p, AR(p),
-using Online Gradient Descent (OGD) with adaptive learning rate and customizable loss functions.
+Estimates the parameters of an Autoregressive AR(p) model using Online Gradient Descent (OGD)
+with sequential observation-by-observation updates across multiple epochs. The method
+incorporates flexible optimization routines by offering quadratic, absolute, Huber, and
+log-cosh loss functions for robust estimation under non-Gaussian noise. Parameter updates
+are dynamically controlled via a Cosine Annealing learning rate schedule, with box-constraints
+to maintain stability and final estimates computed via epoch-averaged trajectories.
+}
+\details{
+The optimization process uses a Cosine Annealing learning rate schedule across 30 epochs,
+smoothly decaying the learning rate from \code{eta = 0.1} down to \code{eta_min = 0.001}.
+To ensure numerical stability, the estimated AR parameters are bounded within
+\verb{[-0.999, 0.999]} at each iteration. For the Huber loss function, the clipping
+threshold is set to \code{delta = 1.345}.
 }
 \examples{
 set.seed(123)
 y <- arima.sim(model = list(ar = c(0.5, -0.2)), n = 100)
 fit <- AR.OGD(y = y, p = 2, loss_function = "quadratic")
-fit@phi
+fit
 }
