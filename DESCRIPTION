@@ -1,8 +1,10 @@
 Package: iARstream
 Title: Classical and Bayesian Online Estimation for AR(p) and iAR Models
 Version: 0.0.0.9000
-Authors@R: 
-    person("Nicol", "González", email = "nicol.gonmac@gmail.com", role = c("aut", "cre"))
+Authors@R: c(
+    person("Nicol", "González", email = "nicol.gonmac@gmail.com", role = "aut"),
+    person("Felipe", "Elorrieta", email = "felipe.elorrieta@usach.cl", role = "cre")
+  )
 Description: Provides classical and Bayesian online estimation methods for AR(p) and iAR Models. 
   Classical optimization routines include Online Gradient Descent (OGD) and Online Newton Step (ONS), 
   supporting quadratic, absolute, Huber, and Log-Cosh loss functions. 
