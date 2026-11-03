@@ -21,9 +21,9 @@ iAR_OPF_class <- S7::new_class(
     if (length(self@times) != length(self@y)) {
       return("The length of @times must be the same as the length of @y")
     }
-    valid_distribution <- c("gaussian", "laplace", "student")
+    valid_distribution <- c("gaussian", "student") # <-- Modificado
     if (!(self@error_distribution %in% valid_distribution)) {
-      return("Property @error_distribution must be 'gaussian', 'laplace' or 'student'.")
+      return("Property @error_distribution must be 'gaussian' or 'student'.") # <-- Modificado
     }
     return(NULL)
   }
@@ -95,7 +95,7 @@ method(est, iAR_OPF_class) <- function(x) {
 #' @param y A numeric vector representing the univariate time series.
 #' @param times A numeric vector of observation times corresponding to `y`. Must have the same length as `y`.
 #' @param error_distribution A character string specifying the assumed noise distribution family.
-#'   Options are `"gaussian"` (default), `"laplace"`, or `"student"`.
+#'   Options are `"gaussian"` (default) or `"student"`.
 #'
 #' @return An object of class `iAR_OPF_class` containing the following slots:
 #' \item{y}{The original input time series.}
@@ -134,7 +134,7 @@ method(est, iAR_OPF_class) <- function(x) {
 #' fit_t <- iAR.OPF(y = y_t, times = times, error_distribution = "student")
 #' fit_t
 iAR.OPF <- function(y, times,
-                    error_distribution = c("gaussian", "laplace", "student")) {
+                    error_distribution = c("gaussian", "student")) {
   if (length(y) < 2) {
     stop("The length of time series @y must be at least 2.")
   }
@@ -179,9 +179,6 @@ iAR.OPF <- function(y, times,
 
     if (error_distribution == "gaussian") {
       log_lik <- -0.5 * (err / sigma_t)^2 - log(sigma_t)
-    } else if (error_distribution == "laplace") {
-      b_t <- sigma_t / sqrt(2)
-      log_lik <- -abs(err) / b_t - log(2 * b_t)
     } else if (error_distribution == "student") {
       s_t <- sigma_t * sqrt((nu - 2) / nu)
       log_lik <- dt(err / s_t, df = nu, log = TRUE) - log(s_t)

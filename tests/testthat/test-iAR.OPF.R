@@ -41,7 +41,7 @@ test_that("iAR.OPF funciona con todas las distribuciones de error soportadas", {
   sim_times <- cumsum(sample(1:2, n_obs, replace = TRUE))
   sim_y <- stats::rt(n_obs, df = 4)
 
-  distributions <- c("gaussian", "laplace", "student")
+  distributions <- c("gaussian", "student")
   for (d in distributions) {
     expect_no_error(
       fit <- iAR.OPF(y = sim_y, times = sim_times, error_distribution = d)
@@ -56,7 +56,7 @@ test_that("Los metodos print y est de iAR_OPF_class funcionan correctamente", {
   n_obs <- 50
   sim_times <- cumsum(sample(1:2, n_obs, replace = TRUE))
   sim_y <- stats::rnorm(n_obs)
-  obj <- iAR_OPF_class(y = sim_y, times = sim_times, error_distribution = "laplace")
+  obj <- iAR_OPF_class(y = sim_y, times = sim_times, error_distribution = "gaussian")
 
   expect_null(obj@phi)
   out_unest <- capture.output(print(obj))

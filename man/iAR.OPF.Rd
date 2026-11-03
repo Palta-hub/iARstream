@@ -4,7 +4,7 @@
 \alias{iAR.OPF}
 \title{Online Particle Filter for Irregularly Observed Autoregressive (iAR) Models}
 \usage{
-iAR.OPF(y, times, error_distribution = c("gaussian", "laplace", "student"))
+iAR.OPF(y, times, error_distribution = c("gaussian", "student"))
 }
 \arguments{
 \item{y}{A numeric vector representing the univariate time series.}
@@ -12,7 +12,7 @@ iAR.OPF(y, times, error_distribution = c("gaussian", "laplace", "student"))
 \item{times}{A numeric vector of observation times corresponding to \code{y}. Must have the same length as \code{y}.}
 
 \item{error_distribution}{A character string specifying the assumed noise distribution family.
-Options are \code{"gaussian"} (default), \code{"laplace"}, or \code{"student"}.}
+Options are \code{"gaussian"} (default) or \code{"student"}.}
 }
 \value{
 An object of class \code{iAR_OPF_class} containing the following slots:
